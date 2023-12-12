@@ -4,7 +4,8 @@ import math
 
 class TokenType(Enum):
     '所有符号类型的基类'
-
+    COMMENT1 = "//"
+    COMMENT2 = "--"
     ORIGIN = "ORIGIN"
     SCALE = "SCALE"
     ROT = "ROT"
@@ -35,7 +36,7 @@ class TokenType(Enum):
     ERRTOKEN = "ERR"
 
 class Token():
-    def __init__(self, Token_Type, lexeme, value=0.0, FuncPtr = None):
+    def __init__(self, Token_Type = "ERRTOKEN", lexeme="", value=0.0, FuncPtr = None):
         self.Token_Type = Token_Type;
         self.lexeme = lexeme;
         self.value = value;
@@ -74,33 +75,34 @@ class Lexer:
     def __init__(self):
         self.tokens = []       # 存储token列表 
         self.line_num = 1      # 跟踪行号
-
-    def extractAlphaToken(self, string, i):
-        tmp_str = string[i]
-        while i + 1 < len(string):
-            char = string[i + 1]
+        self.i = 0
+    def extractAlphaToken(self, string):
+        tmp_str = string[self.i]
+        while self.i + 1 < len(string):
+            char = string[self.i + 1]
             if char.isalnum():
                 tmp_str += char
-                i += 1
+                self.i += 1
             else:
+                # self.i += 1
                 break
         return TokenTypeDict.get(tmp_str, Token(TokenType.ERRTOKEN, tmp_str))
 
-    def extractNumberToken(self, string, i):
-        tmp_num = string[i]
-        while i + 1 < len(string):
-            char = string[i + 1]
+    def extractNumberToken(self, string):
+        tmp_num = string[self.i]
+        while self.i + 1 < len(string):
+            char = string[self.i + 1]
             if char.isdigit():
                 tmp_num += char
-                i += 1
+                self.i += 1
             elif char == '.':
                 tmp_num += char
-                i += 1
-                while i + 1 < len(string):
-                    next_char = string[i + 1]
+                self.i += 1
+                while self.i + 1 < len(string):
+                    next_char = string[self.i + 1]
                     if next_char.isdigit():
                         tmp_num += next_char
-                        i += 1
+                        self.i += 1
                     else:
                         break
                 break
@@ -108,7 +110,7 @@ class Lexer:
                 break
         return Token(TokenType.CONST_ID, tmp_num, float(tmp_num))
 
-    def extractSymbolToken(self, char):
+    def extractSymbolToken(self, char, next_char):
         if char == ';':
             return Token(TokenType.SEMICO, ';')
         elif char == '(':
@@ -120,45 +122,57 @@ class Lexer:
         elif char == '+':
             return Token(TokenType.PLUS, '+')
         elif char == '-':
-            return Token(TokenType.MINUS, '-')
+            if next_char == '-':
+                return Token(TokenType.COMMENT2, '--')
+            else:
+                return Token(TokenType.MINUS, '-')
         elif char == '*':
-            return Token(TokenType.POWER, '**')
+            if next_char == '*':
+                return Token(TokenType.POWER, '**')
+            else: 
+                return Token(TokenType.MUL, '*')
         elif char == '/':
-            return Token(TokenType.DIV, '/')
+            if next_char == '/':
+                return Token(TokenType.COMMENT1, '//')
+            else:
+                return  Token(TokenType.DIV, '/')
         else:
             return Token(TokenType.ERRTOKEN, char)
-
+#表驱动型编码
     def tokenize(self, string, show=False):
         tokens = []
-        i = 0
+        self.i = 0
 
-        while i < len(string):
-            char = string[i]
+        while self.i < len(string):
+            char = string[self.i]
 
             if char == '\n':
                 self.line_num += 1
-                i += 1
+                self.i += 1
                 continue
             elif char in (' ', '\t', '\r'):
-                i += 1
+                self.i += 1
                 continue
             elif char.isalpha():
-                token = self.extractAlphaToken(string, i)
+                token = self.extractAlphaToken(string)
             elif char.isdigit():
-                token = self.extractNumberToken(string, i)
+                token = self.extractNumberToken(string)
             else:
-                token = self.extractSymbolToken(char)
+                if self.i==len(string)-1:
+                    token = self.extractSymbolToken(char,' ')
+                else:
+                    token = self.extractSymbolToken(char,string[self.i+1])
 
             if token:
                 tokens.append(token)
 
-            i += 1
+            self.i += 1
 
         if show:
-            self.showTokens(tokens)
+            self.TokensDisply(tokens)
         return tokens
 
-    def showTokens(self,tokens):
+    def TokensDisply(self,tokens):
         print("Tokentype".rjust(20), "InputStack".rjust(20), "TValue".rjust(20), "FuncPtr".rjust(20))
         for token in tokens:
                 token.display()
@@ -169,8 +183,9 @@ class Lexer:
 lexer = Lexer()
 
 # 要进行词法分析的字符串
-input_string = "--cd LLVM_Pass \n \a hello world.\n SCALE IS (100,100) \n ORIGIN is (320,160)"
-
+input_string = "--cd LLVM_Pass \n \a hello world.\n SCALE IS (100,100) \n ORIGIN is (320,160)//this is a comment 8**8"
+input_string = r"FOR T FROM 0 TO 2*PI STEP PI/50 DRAW (cos(T), sin(T));"
+# print("FOR T FROM 0 TO 2*PI STEP PI/50 DRAW (cos(T), sin(T));")
 # 调用 tokenize 方法进行词法分析
 result_tokens = lexer.tokenize(input_string, True)
 
